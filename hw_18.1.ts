@@ -3,12 +3,20 @@ interface IBankAccount {
     readonly balance: number;
     owner: Client;
     currency: string;
-    deposit(amount: number): void;
-    withdraw(amount: number): void;
-    getTransactionHistory(): string[];
+    getTransactionHistory(): Transaction[];
+    executeTransaction(command: ICommand): void;
 }
 
 type TransactionType = "deposit" | "withdraw";
+
+class Transaction {
+    constructor(
+        public type: TransactionType,
+        public amount: number,
+        public currency: string,
+        public date: Date = new Date()
+    ) {}
+}
 
 class Bank {
     private static instance: Bank;
@@ -33,7 +41,7 @@ class Bank {
 class BankAccount implements IBankAccount {
     private _balance: number;
     private _owner: Client;
-    private transactions: string[] = [];
+    private transactions: Transaction[] = [];
     public readonly accountNumber = this.generateAccountNumber();
     public readonly currency: string;
 
@@ -55,26 +63,30 @@ class BankAccount implements IBankAccount {
         this.currency = currency;
     }
 
-    public deposit(amount: number): void {
+    public getTransactionHistory(): Transaction[] {
+        return this.transactions;
+    }
+
+    public executeTransaction(command: ICommand): void {
+        command.execute();
+    }
+
+    private deposit(amount: number): void {
         if (amount <= 0) {
             console.error("Deposit amount must be positive");
             return;
         }
         this._balance += amount;
-        this.transactions.push(`Deposit: +${amount} ${this.currency}`);
+        this.transactions.push(new Transaction("deposit", amount, this.currency));
     }
 
-    public withdraw(amount: number): void {
+    private withdraw(amount: number): void {
         if (amount > this._balance) {
             console.error("Insufficient funds");
             return;
         }
         this._balance -= amount;
-        this.transactions.push(`Withdraw: -${amount} ${this.currency}`);
-    }
-
-    public getTransactionHistory(): string[] {
-        return this.transactions;
+        this.transactions.push(new Transaction("withdraw", amount, this.currency));
     }
 
     private generateAccountNumber(): string {
@@ -131,26 +143,26 @@ interface ICommand {
 }
 
 class DepositCommand implements ICommand {
-    constructor(private account: IBankAccount, private amount: number) {}
+    constructor(private account: BankAccount, private amount: number) {}
 
     execute(): void {
-        this.account.deposit(this.amount);
+        this.account["deposit"](this.amount);
     }
 
     undo(): void {
-        this.account.withdraw(this.amount);
+        this.account["withdraw"](this.amount);
     }
 }
 
 class WithdrawCommand implements ICommand {
-    constructor(private account: IBankAccount, private amount: number) {}
+    constructor(private account: BankAccount, private amount: number) {}
 
     execute(): void {
-        this.account.withdraw(this.amount);
+        this.account["withdraw"](this.amount);
     }
 
     undo(): void {
-        this.account.deposit(this.amount);
+        this.account["deposit"](this.amount);
     }
 }
 
